@@ -6,8 +6,8 @@ from sklearn.model_selection import train_test_split, RandomizedSearchCV, Repeat
 from sklearn.metrics import classification_report
 
 from toolbox.tf.nn.conv.miniVGGNet import MiniVGGNet
-from toolbox.tf.loading.simple_dataset_loader import SimpleDatasetLoader
-from toolbox.tf.preprocessing.simple_preprocessor import SimplePreprocessor
+from toolbox.loading.simple_dataset_loader import SimpleDatasetLoader
+from toolbox.preprocessing.simple_preprocessor import SimplePreprocessor
 from config import PKL_PATH
 
 import numpy as np
