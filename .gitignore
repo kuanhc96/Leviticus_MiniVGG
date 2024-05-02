@@ -1,1 +1,7 @@
 toolbox
+train
+predict
+pickled_models
+*png
+*jpg
+*hdf5
