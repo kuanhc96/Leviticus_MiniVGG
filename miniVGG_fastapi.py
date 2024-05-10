@@ -104,5 +104,6 @@ def train(request: MiniVGGTrainRequest) -> dict:
     print({"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
              "classificationReport": classificationReport})
 
+
     return {"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
              "classificationReport": classificationReport}
