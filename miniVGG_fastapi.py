@@ -4,11 +4,13 @@ from typing import Optional
 from imutils import paths
 from sklearn.model_selection import train_test_split, RandomizedSearchCV, RepeatedKFold
 from sklearn.metrics import classification_report
+from tensorflow.keras.optimizers import SGD
+from sklearn.preprocessing import LabelBinarizer
 
 from toolbox.tf.nn.conv.miniVGGNet import MiniVGGNet
 from toolbox.loading.simple_dataset_loader import SimpleDatasetLoader
 from toolbox.preprocessing.simple_preprocessor import SimplePreprocessor
-from config import PKL_PATH
+from config import PKL_PATH, EPOCHS
 
 import numpy as np
 import os
@@ -48,18 +50,14 @@ def train(request: MiniVGGTrainRequest) -> dict:
     taskId = request.taskId
     trainOnly = request.trainOnly
 
-    trainX = []
-    testX = []
-
-    trainLabels = []
-    testLabels = []
-
-    predictions = []
-
     imagePaths = list(paths.list_images(dataset))
-    preprocessor = SimplePreprocessor(256, 256)
+    preprocessor = SimplePreprocessor(128, 128)
     loader = SimpleDatasetLoader(preprocessors=[ preprocessor ])
-    (images, labels) = loader(imagePaths)
+    (images, imageLabels) = loader.load(imagePaths)
+
+    images = images.astype("float") / 255.0
+    lb = LabelBinarizer()
+    labels = lb.fit_transform(imageLabels)
 
     print("[INFO] Preparing Training Data")
     if trainOnly:
@@ -70,7 +68,9 @@ def train(request: MiniVGGTrainRequest) -> dict:
         (trainImages, testImages, trainLabels, testLabels) = train_test_split(images, labels, test_size=0.25)
 
     print("[INFO] Fitting Model")
-    model = MiniVGGNet.build(256,  256, 3, num_classes=np.unique(labels))
+    optimizer = SGD(learning_rate=0.01, weight_decay=0.01/EPOCHS, momentum=0.9, nesterov=True)
+    model = MiniVGGNet.build(128,  128, 3, num_classes=len(np.unique(imageLabels)))
+    model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
     model.fit(trainImages, trainLabels)
     print("[INFO] Model Fitting Complete")
 
@@ -92,8 +92,8 @@ def train(request: MiniVGGTrainRequest) -> dict:
         uniqueLabels = np.unique(labels)
 
     print("[INFO] Scoring Model")
-    accuracy = model.score(testImages, testLabels)
-    classificationReport = classification_report(testLabels, predictions, labels=uniqueLabels)
+    accuracy = model.evaluate(testImages, testLabels)
+    classificationReport = classification_report(testLabels.argmax(axis=1), predictions.argmax(axis=1), labels=uniqueLabels)
     print("[INFO] Train Request Complete, Returning Training Results")
 
     print("[INFO] Saving Trained Model")
@@ -102,7 +102,7 @@ def train(request: MiniVGGTrainRequest) -> dict:
     print("[INFO] Training Model Saved")
 
     print({"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
-            **model.get_params(), "classificationReport": classificationReport})
+             "classificationReport": classificationReport})
 
     return {"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
-            **model.get_params(), "classificationReport": classificationReport}
+             "classificationReport": classificationReport}
