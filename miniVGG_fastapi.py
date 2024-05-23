@@ -5,11 +5,13 @@ from imutils import paths
 from sklearn.model_selection import train_test_split, RandomizedSearchCV, RepeatedKFold
 from sklearn.metrics import classification_report
 from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelBinarizer
 
 from toolbox.tf.nn.conv.miniVGGNet import MiniVGGNet
 from toolbox.loading.simple_dataset_loader import SimpleDatasetLoader
 from toolbox.preprocessing.simple_preprocessor import SimplePreprocessor
+from toolbox.utils.compare_directories import _isEqualSubDirs
 from config import PKL_PATH, EPOCHS
 
 import numpy as np
@@ -17,6 +19,11 @@ import os
 
 
 app = FastAPI()
+
+class MiniVGGPredictRequest(BaseModel):
+    trainTaskId: str
+    trainDataset: str
+    predictDataset: str
 
 
 class MiniVGGTrainRequest(BaseModel):
@@ -41,6 +48,46 @@ class MiniVGGTrainResponse(BaseModel):
     # of the resulting model
     classificationReport: str
 
+@app.post("/predict")
+def predict(request: MiniVGGPredictRequest) -> dict:
+    print("[INFO] Received MiniVGG Predict Request")
+    # initialize the local binary patterns descriptor along with the data and label lists
+    trainDataset = request.trainDataset
+    predictDataset = request.predictDataset
+    trainTaskId = request.trainTaskId
+
+    isEqualSubDirs = _isEqualSubDirs(trainDataset, predictDataset)
+    isDirOfImages = len(next(os.walk(predictDataset))[1]) == 0
+    if not isEqualSubDirs and not isDirOfImages:
+        return {"error": "Directory mismatch - incorrect number of subdirectories"}
+
+
+    imagePaths = list(paths.list_images(predictDataset))
+    preprocessor = SimplePreprocessor(128, 128)
+    loader = SimpleDatasetLoader(preprocessors=[ preprocessor ])
+    model = load_model(os.path.join(PKL_PATH, trainTaskId + ".hdf5"))
+    (images, imageLabels, imageNames) = loader.load(imagePaths)
+    images = images.astype("float") / 255.0
+    lb = LabelBinarizer()
+    binarizedLabels = lb.fit_transform(imageLabels)
+    predictions = model.predict(images)
+    report = None
+    accuracy = None
+    if isEqualSubDirs: # has same structure as training set, meaning, the images are labeled
+        report = classification_report(
+            binarizedLabels.argmax(axis=1), 
+            predictions.argmax(axis=-1), 
+            labels=np.unique(imageLabels)
+        )
+        accuracy = model.evaluate(images, binarizedLabels)
+
+        return {
+            "accuracy": accuracy,
+            "classificationReport": report,
+            "predictions": dict(zip(imageNames, predictions.argmax(axis=1)))
+        }
+
+
 @app.post("/train")
 def train(request: MiniVGGTrainRequest) -> dict:
     print("[INFO] Received MiniVGG Training Request")
@@ -53,7 +100,7 @@ def train(request: MiniVGGTrainRequest) -> dict:
     imagePaths = list(paths.list_images(dataset))
     preprocessor = SimplePreprocessor(128, 128)
     loader = SimpleDatasetLoader(preprocessors=[ preprocessor ])
-    (images, imageLabels) = loader.load(imagePaths)
+    (images, imageLabels, _) = loader.load(imagePaths)
 
     images = images.astype("float") / 255.0
     lb = LabelBinarizer()
