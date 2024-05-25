@@ -76,16 +76,17 @@ def predict(request: MiniVGGPredictRequest) -> dict:
     if isEqualSubDirs: # has same structure as training set, meaning, the images are labeled
         report = classification_report(
             binarizedLabels.argmax(axis=1), 
-            predictions.argmax(axis=-1), 
+            predictions.argmax(axis=1), 
             labels=np.unique(imageLabels)
         )
         accuracy = model.evaluate(images, binarizedLabels)
 
-        return {
-            "accuracy": accuracy,
-            "classificationReport": report,
-            "predictions": dict(zip(imageNames, predictions.argmax(axis=1)))
-        }
+    print("[INFO] Prediction Complete. Preparing Response")
+    return {
+        "accuracy": accuracy,
+        "classificationReport": report,
+        "predictions": dict(zip(imageNames, lb.inverse_transform(predictions).tolist()))
+    }
 
 
 @app.post("/train")
@@ -118,7 +119,7 @@ def train(request: MiniVGGTrainRequest) -> dict:
     optimizer = SGD(learning_rate=0.01, weight_decay=0.01/EPOCHS, momentum=0.9, nesterov=True)
     model = MiniVGGNet.build(128,  128, 3, num_classes=len(np.unique(imageLabels)))
     model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
-    model.fit(trainImages, trainLabels)
+    model.fit(trainImages, trainLabels, batch_size=32, epochs=EPOCHS, verbose=1)
     print("[INFO] Model Fitting Complete")
 
     if trainOnly:
