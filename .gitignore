@@ -5,3 +5,4 @@ pickled_models
 *png
 *jpg
 *hdf5
+__pycache__

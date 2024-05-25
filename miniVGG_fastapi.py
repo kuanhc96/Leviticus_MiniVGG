@@ -4,17 +4,26 @@ from typing import Optional
 from imutils import paths
 from sklearn.model_selection import train_test_split, RandomizedSearchCV, RepeatedKFold
 from sklearn.metrics import classification_report
+from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.models import load_model
+from sklearn.preprocessing import LabelBinarizer
 
 from toolbox.tf.nn.conv.miniVGGNet import MiniVGGNet
 from toolbox.loading.simple_dataset_loader import SimpleDatasetLoader
 from toolbox.preprocessing.simple_preprocessor import SimplePreprocessor
-from config import PKL_PATH
+from toolbox.utils.compare_directories import _isEqualSubDirs
+from config import PKL_PATH, EPOCHS
 
 import numpy as np
 import os
 
 
 app = FastAPI()
+
+class MiniVGGPredictRequest(BaseModel):
+    trainTaskId: str
+    trainDataset: str
+    predictDataset: str
 
 
 class MiniVGGTrainRequest(BaseModel):
@@ -39,6 +48,47 @@ class MiniVGGTrainResponse(BaseModel):
     # of the resulting model
     classificationReport: str
 
+@app.post("/predict")
+def predict(request: MiniVGGPredictRequest) -> dict:
+    print("[INFO] Received MiniVGG Predict Request")
+    # initialize the local binary patterns descriptor along with the data and label lists
+    trainDataset = request.trainDataset
+    predictDataset = request.predictDataset
+    trainTaskId = request.trainTaskId
+
+    isEqualSubDirs = _isEqualSubDirs(trainDataset, predictDataset)
+    isDirOfImages = len(next(os.walk(predictDataset))[1]) == 0
+    if not isEqualSubDirs and not isDirOfImages:
+        return {"error": "Directory mismatch - incorrect number of subdirectories"}
+
+
+    imagePaths = list(paths.list_images(predictDataset))
+    preprocessor = SimplePreprocessor(128, 128)
+    loader = SimpleDatasetLoader(preprocessors=[ preprocessor ])
+    model = load_model(os.path.join(PKL_PATH, trainTaskId + ".hdf5"))
+    (images, imageLabels, imageNames) = loader.load(imagePaths)
+    images = images.astype("float") / 255.0
+    lb = LabelBinarizer()
+    binarizedLabels = lb.fit_transform(imageLabels)
+    predictions = model.predict(images)
+    report = None
+    accuracy = None
+    if isEqualSubDirs: # has same structure as training set, meaning, the images are labeled
+        report = classification_report(
+            binarizedLabels.argmax(axis=1), 
+            predictions.argmax(axis=1), 
+            labels=np.unique(imageLabels)
+        )
+        accuracy = model.evaluate(images, binarizedLabels)
+
+    print("[INFO] Prediction Complete. Preparing Response")
+    return {
+        "accuracy": accuracy,
+        "classificationReport": report,
+        "predictions": dict(zip(imageNames, lb.inverse_transform(predictions).tolist()))
+    }
+
+
 @app.post("/train")
 def train(request: MiniVGGTrainRequest) -> dict:
     print("[INFO] Received MiniVGG Training Request")
@@ -48,18 +98,14 @@ def train(request: MiniVGGTrainRequest) -> dict:
     taskId = request.taskId
     trainOnly = request.trainOnly
 
-    trainX = []
-    testX = []
-
-    trainLabels = []
-    testLabels = []
-
-    predictions = []
-
     imagePaths = list(paths.list_images(dataset))
-    preprocessor = SimplePreprocessor(256, 256)
+    preprocessor = SimplePreprocessor(128, 128)
     loader = SimpleDatasetLoader(preprocessors=[ preprocessor ])
-    (images, labels) = loader(imagePaths)
+    (images, imageLabels, _) = loader.load(imagePaths)
+
+    images = images.astype("float") / 255.0
+    lb = LabelBinarizer()
+    labels = lb.fit_transform(imageLabels)
 
     print("[INFO] Preparing Training Data")
     if trainOnly:
@@ -70,8 +116,10 @@ def train(request: MiniVGGTrainRequest) -> dict:
         (trainImages, testImages, trainLabels, testLabels) = train_test_split(images, labels, test_size=0.25)
 
     print("[INFO] Fitting Model")
-    model = MiniVGGNet.build(256,  256, 3, num_classes=np.unique(labels))
-    model.fit(trainImages, trainLabels)
+    optimizer = SGD(learning_rate=0.01, weight_decay=0.01/EPOCHS, momentum=0.9, nesterov=True)
+    model = MiniVGGNet.build(128,  128, 3, num_classes=len(np.unique(imageLabels)))
+    model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
+    model.fit(trainImages, trainLabels, batch_size=32, epochs=EPOCHS, verbose=1)
     print("[INFO] Model Fitting Complete")
 
     if trainOnly:
@@ -92,8 +140,8 @@ def train(request: MiniVGGTrainRequest) -> dict:
         uniqueLabels = np.unique(labels)
 
     print("[INFO] Scoring Model")
-    accuracy = model.score(testImages, testLabels)
-    classificationReport = classification_report(testLabels, predictions, labels=uniqueLabels)
+    accuracy = model.evaluate(testImages, testLabels)
+    classificationReport = classification_report(testLabels.argmax(axis=1), predictions.argmax(axis=1), labels=uniqueLabels)
     print("[INFO] Train Request Complete, Returning Training Results")
 
     print("[INFO] Saving Trained Model")
@@ -102,7 +150,8 @@ def train(request: MiniVGGTrainRequest) -> dict:
     print("[INFO] Training Model Saved")
 
     print({"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
-            **model.get_params(), "classificationReport": classificationReport})
+             "classificationReport": classificationReport})
+
 
     return {"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
-            **model.get_params(), "classificationReport": classificationReport}
+             "classificationReport": classificationReport}
