@@ -17,6 +17,13 @@ from config import PKL_PATH, EPOCHS
 import numpy as np
 import os
 
+"""
+Train Curl:
+curl -X POST "http://localhost:8001/train" -H "Content-Type: application/json" -d '{"taskId": "TR-123456-20240502171300", "trainOnly": false,"dataset":"/app/train/animals"}'
+Predict Curl:
+curl -X POST "http://localhost:8001/predict" -H "Content-Type: application/json" -d '{"trainTaskId": "TR-123456-20240502171300", "trainDataset":"/app/train/animals", "predictDataset":"/app/predict/animals"}'
+"""
+
 
 app = FastAPI()
 
