@@ -153,7 +153,7 @@ def train(request: MiniVGGTrainRequest) -> dict:
     print("[INFO] Train Request Complete, Returning Training Results")
 
     print("[INFO] Saving Trained Model")
-    modelPath = os.path.join(PKL_PATH, int(taskId) + ".hdf5")
+    modelPath = os.path.join(PKL_PATH, str(taskId) + ".hdf5")
     model.save(modelPath)
     print("[INFO] Training Model Saved")
 
