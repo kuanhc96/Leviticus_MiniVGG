@@ -148,6 +148,9 @@ def train(request: MiniVGGTrainRequest) -> dict:
         uniqueLabels = np.unique(labels)
 
     print("[INFO] Scoring Model")
+    # model.evaluate will return a list with two values:
+    # first value: training loss
+    # second value: training accuracy
     accuracy = model.evaluate(testImages, testLabels, batch_size=32)[1]
     classificationReport = classification_report(testLabels.argmax(axis=1), predictions.argmax(axis=1), labels=uniqueLabels)
     print("[INFO] Train Request Complete, Returning Training Results")
