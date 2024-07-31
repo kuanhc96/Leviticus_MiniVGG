@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict
 from imutils import paths
 from sklearn.model_selection import train_test_split, RandomizedSearchCV, RepeatedKFold
 from sklearn.metrics import classification_report
@@ -26,6 +26,11 @@ curl -X POST "http://localhost:8001/predict" -H "Content-Type: application/json"
 
 
 app = FastAPI()
+
+class MiniVGGPredictResponse(BaseModel):
+    accuracy: float
+    classificationReport: str
+    predictions: Dict[str, str]
 
 class MiniVGGPredictRequest(BaseModel):
     trainTaskId: str
@@ -91,12 +96,12 @@ def predict(request: MiniVGGPredictRequest) -> dict:
         accuracy = model.evaluate(images, binarizedLabels)
 
     print("[INFO] Prediction Complete. Preparing Response")
-    return {
-        "accuracy": accuracy,
-        "classificationReport": report,
-        "predictions": dict(zip(imageNames, lb.inverse_transform(predictions).tolist()))
-    }
-
+    response = MiniVGGPredictResponse(
+        accuracy=accuracy,
+        classificationReport=report,
+        predictions=dict(zip(imageNames, lb.inverse_transform(predictions).tolist()))
+    )
+    return response
 
 @app.post("/train")
 def train(request: MiniVGGTrainRequest) -> dict:
