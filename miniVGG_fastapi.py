@@ -31,6 +31,7 @@ class MiniVGGPredictRequest(BaseModel):
     trainTaskId: str
     trainDataset: str
     predictDataset: str
+    weightsFile: str
 
 
 class MiniVGGTrainRequest(BaseModel):
@@ -62,6 +63,7 @@ def predict(request: MiniVGGPredictRequest) -> dict:
     trainDataset = request.trainDataset
     predictDataset = request.predictDataset
     trainTaskId = request.trainTaskId
+    weightsFile = request.weightsFile
 
     isEqualSubDirs = _isEqualSubDirs(trainDataset, predictDataset)
     isDirOfImages = len(next(os.walk(predictDataset))[1]) == 0
@@ -72,7 +74,7 @@ def predict(request: MiniVGGPredictRequest) -> dict:
     imagePaths = list(paths.list_images(predictDataset))
     preprocessor = SimplePreprocessor(128, 128)
     loader = SimpleDatasetLoader(preprocessors=[ preprocessor ])
-    model = load_model(os.path.join(PKL_PATH, trainTaskId + ".hdf5"))
+    model = load_model(weightsFile)
     (images, imageLabels, imageNames) = loader.load(imagePaths)
     images = images.astype("float") / 255.0
     lb = LabelBinarizer()
