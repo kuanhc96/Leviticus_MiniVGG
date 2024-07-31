@@ -167,9 +167,12 @@ def train(request: MiniVGGTrainRequest) -> dict:
     model.save(modelPath)
     print("[INFO] Training Model Saved")
 
-    print({"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
-             "classificationReport": classificationReport})
+    response = MiniVGGTrainResponse(
+        taskId=taskId,
+        modelPath=modelPath,
+        accuracy=accuracy,
+        classificationReport=classificationReport
+    )
 
 
-    return {"taskId": taskId, "modelPath": modelPath, "accuracy": accuracy, 
-             "classificationReport": classificationReport}
+    return response
