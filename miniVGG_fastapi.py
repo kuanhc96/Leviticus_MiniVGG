@@ -84,14 +84,14 @@ def predict(request: MiniVGGPredictRequest) -> MiniVGGPredictResponse:
     images = images.astype("float") / 255.0
     lb = LabelBinarizer()
     binarizedLabels = lb.fit_transform(imageLabels)
-    predictions = model.predict(images)
+    predictions = model.predict(images, batch_size=32)
     report = None
     accuracy = None
     if isEqualSubDirs: # has same structure as training set, meaning, the images are labeled
         report = classification_report(
             binarizedLabels.argmax(axis=1), 
             predictions.argmax(axis=1), 
-            labels=np.unique(imageLabels)
+            target_names=np.unique(imageLabels)
         )
         accuracy = model.evaluate(images, binarizedLabels)[1]
 
@@ -159,7 +159,7 @@ def train(request: MiniVGGTrainRequest) -> MiniVGGTrainResponse:
     # first value: training loss
     # second value: training accuracy
     accuracy = model.evaluate(testImages, testLabels, batch_size=32)[1]
-    classificationReport = classification_report(testLabels.argmax(axis=1), predictions.argmax(axis=1), labels=uniqueLabels)
+    classificationReport = classification_report(testLabels.argmax(axis=1), predictions.argmax(axis=1), target_names=uniqueLabels)
     print("[INFO] Train Request Complete, Returning Training Results")
 
     print("[INFO] Saving Trained Model")
