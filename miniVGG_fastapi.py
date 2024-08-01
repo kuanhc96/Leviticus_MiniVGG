@@ -93,7 +93,7 @@ def predict(request: MiniVGGPredictRequest) -> MiniVGGPredictResponse:
             predictions.argmax(axis=1), 
             labels=np.unique(imageLabels)
         )
-        accuracy = model.evaluate(images, binarizedLabels)
+        accuracy = model.evaluate(images, binarizedLabels)[1]
 
     print("[INFO] Prediction Complete. Preparing Response")
     response = MiniVGGPredictResponse(
