@@ -62,7 +62,7 @@ class MiniVGGTrainResponse(BaseModel):
     classificationReport: str
 
 @app.post("/predict")
-def predict(request: MiniVGGPredictRequest) -> dict:
+def predict(request: MiniVGGPredictRequest) -> MiniVGGPredictResponse:
     print("[INFO] Received MiniVGG Predict Request")
     # initialize the local binary patterns descriptor along with the data and label lists
     trainDataset = request.trainDataset
@@ -104,7 +104,7 @@ def predict(request: MiniVGGPredictRequest) -> dict:
     return response
 
 @app.post("/train")
-def train(request: MiniVGGTrainRequest) -> dict:
+def train(request: MiniVGGTrainRequest) -> MiniVGGTrainResponse:
     print("[INFO] Received MiniVGG Training Request")
     # initialize the local binary patterns descriptor along with the data and label lists
     dataset = request.dataset
