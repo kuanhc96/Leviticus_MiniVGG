@@ -33,7 +33,7 @@ class MiniVGGPredictResponse(BaseModel):
     predictions: Dict[str, str]
 
 class MiniVGGPredictRequest(BaseModel):
-    trainTaskId: str
+    trainId: int
     trainDataset: str
     predictDataset: str
     weightsFile: str
@@ -67,7 +67,7 @@ def predict(request: MiniVGGPredictRequest) -> MiniVGGPredictResponse:
     # initialize the local binary patterns descriptor along with the data and label lists
     trainDataset = request.trainDataset
     predictDataset = request.predictDataset
-    trainTaskId = request.trainTaskId
+    trainTaskId = request.trainId
     weightsFile = request.weightsFile
 
     isEqualSubDirs = _isEqualSubDirs(trainDataset, predictDataset)
